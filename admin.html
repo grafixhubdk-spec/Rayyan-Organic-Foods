@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rayyan Organic Foods Admin</title>
+<style>
+body{font-family:Arial;background:#f5f5ed;margin:0;color:#243c2c}
+header{background:#174d32;color:white;padding:20px}
+main{max-width:900px;margin:auto;padding:18px}
+.card{background:white;padding:18px;margin:15px 0;border-radius:12px}
+input,select,button{box-sizing:border-box;width:100%;padding:12px;margin:7px 0;border:1px solid #ccc;border-radius:7px}
+button{background:#174d32;color:white;border:0;font-weight:bold}
+.danger{background:#b52d2d}
+.item{padding:12px;border-bottom:1px solid #ddd}
+.hidden{display:none}
+</style>
+</head>
+<body>
+
+<header>
+<h2>Rayyan Organic Foods</h2>
+<p>Admin Dashboard</p>
+</header>
+
+<main>
+<div class="card" id="login">
+<h3>Admin Login</h3>
+<input id="email" type="email" placeholder="Admin Email">
+<input id="password" type="password" placeholder="Password">
+<button onclick="loginAdmin()">Login</button>
+<p id="message"></p>
+</div>
+
+<div id="dashboard" class="hidden">
+
+<div class="card">
+<h3>Welcome Admin</h3>
+<button onclick="logoutAdmin()">Logout</button>
+</div>
+
+<div class="card">
+<h3>Add New Product</h3>
+<input id="name" placeholder="Product Name">
+<input id="category" placeholder="Category">
+<input id="price" type="number" placeholder="Price">
+<input id="unit" placeholder="Unit e.g. kg">
+<input id="photo" placeholder="Product Image URL (optional)">
+<button onclick="addProduct()">Add Product</button>
+<p id="productMessage"></p>
+</div>
+
+<div class="card">
+<h3>All Products</h3>
+<div id="products">Loading...</div>
+</div>
+
+<div class="card">
+<h3>Customer Orders</h3>
+<div id="orders">Loading...</div>
+</div>
+
+</div>
+</main>
+
+<script type="module">
+
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+import {
+getAuth, signInWithEmailAndPassword,
+onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+import {
+getFirestore, collection, addDoc,
+getDocs, deleteDoc, doc, query, where,
+serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+apiKey: "AIzaSyC5eJpA5M2Zq2UW4dMV29IUDDxVBpzLoIA",
+authDomain: "rayyan-organic-foods.firebaseapp.com",
+projectId: "rayyan-organic-foods",
+storageBucket: "rayyan-organic-foods.firebasestorage.app",
+messagingSenderId: "307898045783",
+appId: "1:307898045783:web:6cc3fa3cc3721ce6b91a12"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+window.loginAdmin = async function(){
+ const email = document.getElementById("email").value.trim();
+ const password = document.getElementById("password").value;
+ const msg = document.getElementById("message");
+
+ try {
+   await signInWithEmailAndPassword(auth,email,password);
+   msg.textContent = "Checking admin access...";
+ } catch(e) {
+   msg.textContent = "Login error: " + e.message;
+ }
+};
+
+onAuthStateChanged(auth, async(user)=>{
+ const loginBox=document.getElementById("login");
+ const dashboard=document.getElementById("dashboard");
+
+ if(!user){
+   loginBox.classList.remove("hidden");
+   dashboard.classList.add("hidden");
+   return;
+ }
+
+ try {
+   const q=query(collection(db,"admins"),
+     where("email","==",user.email),
+     where("role","==","admin"));
+
+   const result=await getDocs(q);
+
+   if(result.empty){
+     await signOut(auth);
+     document.getElementById("message").textContent =
+       "You are not an authorized admin.";
+     return;
+   }
+
+   loginBox.classList.add("hidden");
+   dashboard.classList.remove("hidden");
+   loadProducts();
+   loadOrders();
+
+ } catch(e){
+   document.getElementById("message").textContent =
+     "Admin verification error: "+e.message;
+ }
+});
+
+window.logoutAdmin=async function(){
+ await signOut(auth);
+};
+
+window.addProduct=async function(){
+ const name=document.getElementById("name").value.trim();
+ const category=document.getElementById("category").value.trim();
+ const price=Number(document.getElementById("price").value);
+ const unit=document.getElementById("unit").value.trim();
+ const photo=document.getElementById("photo").value.trim();
+
+ if(!name || !category || !price || !unit){
+   alert("Please fill all required fields.");
+   return;
+ }
+
+ try{
+   await addDoc(collection(db,"products"),{
+     name_en:name,
+     category:category,
+     price:price,
+     unit:unit,
+     image:photo,
+     available:true,
+     createdAt:serverTimestamp()
+   });
+
+   document.getElementById("productMessage").textContent =
+     "Product added successfully!";
+
+   ["name","category","price","unit","photo"].forEach(id=>{
+     document.getElementById(id).value="";
+   });
+
+   loadProducts();
+
+ }catch(e){
+   alert("Error: "+e.message);
+ }
+};
+
+async function loadProducts(){
+ const box=document.getElementById("products");
+ box.innerHTML="Loading...";
+
+ try{
+   const snap=await getDocs(collection(db,"products"));
+   box.innerHTML="";
+
+   snap.forEach(d=>{
+     const p=d.data();
+     const div=document.createElement("div");
+     div.className="item";
+
+     const title=document.createElement("b");
+     title.textContent=p.name_en || d.id;
+
+     const details=document.createElement("p");
+     details.textContent="Price: "+(p.price ?? "")+
+       " | Unit: "+(p.unit || "");
+
+     const del=document.createElement("button");
+     del.className="danger";
+     del.textContent="Delete";
+     del.onclick=()=>removeProduct(d.id);
+
+     div.append(title,details,del);
+     box.appendChild(div);
+   });
+
+   if(snap.empty) box.textContent="No products found.";
+
+ }catch(e){
+   box.textContent="Error: "+e.message;
+ }
+}
+
+window.removeProduct=async function(id){
+ if(!confirm("Delete this product?"))return;
+
+ try{
+   await deleteDoc(doc(db,"products",id));
+   loadProducts();
+ }catch(e){
+   alert(e.message);
+ }
+};
+
+async function loadOrders(){
+ const box=document.getElementById("orders");
+ try{
+   const snap=await getDocs(collection(db,"orders"));
+   box.innerHTML="";
+
+   snap.forEach(d=>{
+     const o=d.data();
+     const div=document.createElement("div");
+     div.className="item";
+     const title=document.createElement("b");
+     title.textContent="Order: "+d.id;
+     const details=document.createElement("p");
+     details.textContent=
+       "Customer: "+(o.name || o.customerName || "N/A")+
+       " | Phone: "+(o.phone || "N/A")+
+       " | Status: "+(o.status || "Pending");
+     div.append(title,details);
+     box.appendChild(div);
+   });
+
+   if(snap.empty)box.textContent="No orders yet.";
+
+ }catch(e){
+   box.textContent="Orders: "+e.message;
+ }
+}
+
+</script>
+</body>
+</html>
