@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'Rayyan_Organic_Foods_AdminPanel_PhotoUpload.zip'
       - 'Rayyan_Organic_Foods_AdminPanel_Android_Project.zip'
       - 'Rayyan_Organic_Foods_Android_Project.zip'
       - '.github/workflows/rayyan-android-build.yml'
@@ -33,7 +34,9 @@ jobs:
       - name: Extract Android project
         shell: bash
         run: |
-          if [ -f Rayyan_Organic_Foods_AdminPanel_Android_Project.zip ]; then
+          if [ -f Rayyan_Organic_Foods_AdminPanel_PhotoUpload.zip ]; then
+            PROJECT_ZIP=Rayyan_Organic_Foods_AdminPanel_PhotoUpload.zip
+          elif [ -f Rayyan_Organic_Foods_AdminPanel_Android_Project.zip ]; then
             PROJECT_ZIP=Rayyan_Organic_Foods_AdminPanel_Android_Project.zip
           elif [ -f Rayyan_Organic_Foods_Android_Project.zip ]; then
             PROJECT_ZIP=Rayyan_Organic_Foods_Android_Project.zip
@@ -41,6 +44,8 @@ jobs:
             echo 'Android project ZIP was not found.'
             exit 1
           fi
+
+          echo "Building from: $PROJECT_ZIP"
           unzip -q "$PROJECT_ZIP" -d source
           test -f source/RayyanOrganicFoodsAndroid/app/build.gradle
           test -f source/RayyanOrganicFoodsAndroid/app/src/main/assets/index.html
