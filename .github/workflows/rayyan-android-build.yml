@@ -1,30 +1,49 @@
+
 name: Build Rayyan Organic Foods APK
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'Rayyan_Organic_Foods_AdminPanel_Android_Project.zip'
+      - 'Rayyan_Organic_Foods_Android_Project.zip'
+      - '.github/workflows/rayyan-android-build.yml'
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Build APK
+      - name: Extract Android project
+        shell: bash
         run: |
-          unzip -q Rayyan_Organic_Foods_Updated_Android_Project.zip -d source
+          if [ -f Rayyan_Organic_Foods_AdminPanel_Android_Project.zip ]; then
+            PROJECT_ZIP=Rayyan_Organic_Foods_AdminPanel_Android_Project.zip
+          elif [ -f Rayyan_Organic_Foods_Android_Project.zip ]; then
+            PROJECT_ZIP=Rayyan_Organic_Foods_Android_Project.zip
+          else
+            echo 'Android project ZIP was not found.'
+            exit 1
+          fi
+          unzip -q "$PROJECT_ZIP" -d source
+          test -f source/RayyanOrganicFoodsAndroid/app/build.gradle
+          test -f source/RayyanOrganicFoodsAndroid/app/src/main/assets/index.html
           cd source/RayyanOrganicFoodsAndroid
           gradle assembleDebug
 
@@ -32,5 +51,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Rayyan-Organic-Foods-APK
-          path: source/RayyanOrganicFoodsAndroid/app/build/outputs/apk/debug/app-debug.apk
+          path: source/RayyanOrganicFoodsAndroid/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          
